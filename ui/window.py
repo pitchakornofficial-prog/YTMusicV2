@@ -11,6 +11,10 @@ class MusicWindow:
 
         self.state = state
 
+        # =================================================
+        # Window
+        # =================================================
+
         self.root = tk.Tk()
 
         self.root.title("TYMusicV2")
@@ -62,12 +66,24 @@ class MusicWindow:
             value="PAUSED"
         )
 
-        self.lyric_var = tk.StringVar(
+        # =================================================
+        # Lyrics variables
+        # =================================================
+
+        self.previous_lyric_var = tk.StringVar(
+            value=""
+        )
+
+        self.current_lyric_var = tk.StringVar(
             value="Waiting for lyrics..."
         )
 
+        self.next_lyric_var = tk.StringVar(
+            value=""
+        )
+
         # =================================================
-        # Album art cache
+        # Album art
         # =================================================
 
         self.album_image = None
@@ -116,6 +132,15 @@ class MusicWindow:
         )
 
         # =================================================
+        # Resize
+        # =================================================
+
+        self.root.bind(
+            "<Configure>",
+            self.on_resize
+        )
+
+        # =================================================
         # Update
         # =================================================
 
@@ -155,12 +180,12 @@ class MusicWindow:
 
     def build_ui(self):
 
-        main = tk.Frame(
+        self.main = tk.Frame(
             self.root,
             bg=self.bg
         )
 
-        main.pack(
+        self.main.pack(
             fill="both",
             expand=True,
             padx=35,
@@ -172,7 +197,7 @@ class MusicWindow:
         # =================================================
 
         header = tk.Frame(
-            main,
+            self.main,
             bg=self.bg
         )
 
@@ -240,15 +265,15 @@ class MusicWindow:
         )
 
         # =================================================
-        # Music card
+        # Music Card
         # =================================================
 
-        music_card = tk.Frame(
-            main,
+        self.music_card = tk.Frame(
+            self.main,
             bg=self.panel
         )
 
-        music_card.pack(
+        self.music_card.pack(
             fill="x",
             pady=(28, 20)
         )
@@ -257,25 +282,25 @@ class MusicWindow:
         # Album Art
         # =================================================
 
-        album_container = tk.Frame(
-            music_card,
+        self.album_container = tk.Frame(
+            self.music_card,
             width=250,
             height=250,
             bg=self.card
         )
 
-        album_container.pack(
+        self.album_container.pack(
             side="left",
             padx=25,
             pady=25
         )
 
-        album_container.pack_propagate(
+        self.album_container.pack_propagate(
             False
         )
 
         self.album_art = tk.Label(
-            album_container,
+            self.album_container,
             text="♪",
             font=(
                 "Segoe UI",
@@ -294,12 +319,12 @@ class MusicWindow:
         # Information
         # =================================================
 
-        info = tk.Frame(
-            music_card,
+        self.info = tk.Frame(
+            self.music_card,
             bg=self.panel
         )
 
-        info.pack(
+        self.info.pack(
             side="left",
             fill="both",
             expand=True,
@@ -308,7 +333,7 @@ class MusicWindow:
         )
 
         now_playing = tk.Label(
-            info,
+            self.info,
             text="NOW PLAYING",
             font=(
                 "Segoe UI",
@@ -325,7 +350,7 @@ class MusicWindow:
         )
 
         self.title_label = tk.Label(
-            info,
+            self.info,
             textvariable=self.title_var,
             font=(
                 "Segoe UI",
@@ -344,8 +369,8 @@ class MusicWindow:
             anchor="w"
         )
 
-        artist = tk.Label(
-            info,
+        self.artist_label = tk.Label(
+            self.info,
             textvariable=self.artist_var,
             font=(
                 "Segoe UI",
@@ -356,13 +381,13 @@ class MusicWindow:
             anchor="w"
         )
 
-        artist.pack(
+        self.artist_label.pack(
             fill="x",
             pady=(8, 0)
         )
 
-        album = tk.Label(
-            info,
+        self.album_label = tk.Label(
+            self.info,
             textvariable=self.album_var,
             font=(
                 "Segoe UI",
@@ -373,13 +398,13 @@ class MusicWindow:
             anchor="w"
         )
 
-        album.pack(
+        self.album_label.pack(
             fill="x",
             pady=(5, 18)
         )
 
         source_frame = tk.Frame(
-            info,
+            self.info,
             bg=self.panel
         )
 
@@ -408,7 +433,7 @@ class MusicWindow:
         # =================================================
 
         progress_section = tk.Frame(
-            main,
+            self.main,
             bg=self.bg
         )
 
@@ -469,23 +494,23 @@ class MusicWindow:
         )
 
         # =================================================
-        # Lyrics
+        # Lyrics Card
         # =================================================
 
-        lyrics_card = tk.Frame(
-            main,
+        self.lyrics_card = tk.Frame(
+            self.main,
             bg=self.panel
         )
 
-        lyrics_card.pack(
+        self.lyrics_card.pack(
             fill="both",
             expand=True,
             pady=(22, 0)
         )
 
         lyrics_header = tk.Label(
-            lyrics_card,
-            text="CURRENT LYRICS",
+            self.lyrics_card,
+            text="LYRICS",
             font=(
                 "Segoe UI",
                 9,
@@ -496,12 +521,39 @@ class MusicWindow:
         )
 
         lyrics_header.pack(
-            pady=(15, 0)
+            pady=(12, 4)
         )
 
-        self.lyric_label = tk.Label(
-            lyrics_card,
-            textvariable=self.lyric_var,
+        # =================================================
+        # Previous lyric
+        # =================================================
+
+        self.previous_lyric_label = tk.Label(
+            self.lyrics_card,
+            textvariable=self.previous_lyric_var,
+            font=(
+                "Segoe UI",
+                12
+            ),
+            fg="#666666",
+            bg=self.panel,
+            wraplength=760,
+            justify="center"
+        )
+
+        self.previous_lyric_label.pack(
+            fill="x",
+            padx=30,
+            pady=(4, 2)
+        )
+
+        # =================================================
+        # Current lyric
+        # =================================================
+
+        self.current_lyric_label = tk.Label(
+            self.lyrics_card,
+            textvariable=self.current_lyric_var,
             font=(
                 "Segoe UI",
                 22,
@@ -513,10 +565,113 @@ class MusicWindow:
             justify="center"
         )
 
-        self.lyric_label.pack(
-            fill="both",
-            expand=True,
-            padx=30
+        self.current_lyric_label.pack(
+            fill="x",
+            padx=30,
+            pady=(
+                6,
+                6
+            )
+        )
+
+        # =================================================
+        # Next lyric
+        # =================================================
+
+        self.next_lyric_label = tk.Label(
+            self.lyrics_card,
+            textvariable=self.next_lyric_var,
+            font=(
+                "Segoe UI",
+                12
+            ),
+            fg="#666666",
+            bg=self.panel,
+            wraplength=760,
+            justify="center"
+        )
+
+        self.next_lyric_label.pack(
+            fill="x",
+            padx=30,
+            pady=(2, 12)
+        )
+
+    # =====================================================
+    # Resize
+    # =====================================================
+
+    def on_resize(self, event):
+
+        if event.widget != self.root:
+            return
+
+        width = event.width
+
+        # -------------------------------------------------
+        # Album art size
+        # -------------------------------------------------
+
+        if width < 820:
+
+            art_size = 190
+
+        elif width < 1000:
+
+            art_size = 220
+
+        else:
+
+            art_size = 250
+
+        self.album_container.configure(
+            width=art_size,
+            height=art_size
+        )
+
+        # -------------------------------------------------
+        # Title font
+        # -------------------------------------------------
+
+        if width < 820:
+
+            title_size = 20
+
+        elif width < 1000:
+
+            title_size = 23
+
+        else:
+
+            title_size = 25
+
+        self.title_label.configure(
+            font=(
+                "Segoe UI",
+                title_size,
+                "bold"
+            )
+        )
+
+        # -------------------------------------------------
+        # Lyrics width
+        # -------------------------------------------------
+
+        lyric_width = max(
+            500,
+            width - 100
+        )
+
+        self.previous_lyric_label.configure(
+            wraplength=lyric_width
+        )
+
+        self.current_lyric_label.configure(
+            wraplength=lyric_width
+        )
+
+        self.next_lyric_label.configure(
+            wraplength=lyric_width
         )
 
     # =====================================================
@@ -554,9 +709,14 @@ class MusicWindow:
                 "RGB"
             )
 
-            # Make the image exactly fit the album-art box
+            size = self.album_container.winfo_width()
+
+            if size <= 1:
+
+                size = 250
+
             image = image.resize(
-                (250, 250),
+                (size, size),
                 Image.Resampling.LANCZOS
             )
 
@@ -582,6 +742,117 @@ class MusicWindow:
             self.album_art.configure(
                 image="",
                 text="♪"
+            )
+
+    # =====================================================
+    # Lyrics
+    # =====================================================
+
+    def update_lyrics(
+        self,
+        lyrics,
+        current_index
+    ):
+
+        if not lyrics:
+
+            self.previous_lyric_var.set(
+                ""
+            )
+
+            self.current_lyric_var.set(
+                "Waiting for lyrics..."
+            )
+
+            self.next_lyric_var.set(
+                ""
+            )
+
+            return
+
+        # -------------------------------------------------
+        # Previous
+        # -------------------------------------------------
+
+        previous_index = (
+            current_index - 1
+        )
+
+        if (
+            previous_index >= 0
+            and previous_index < len(lyrics)
+        ):
+
+            previous_text = lyrics[
+                previous_index
+            ]["text"]
+
+            self.previous_lyric_var.set(
+                previous_text
+            )
+
+        else:
+
+            self.previous_lyric_var.set(
+                ""
+            )
+
+        # -------------------------------------------------
+        # Current
+        # -------------------------------------------------
+
+        if (
+            current_index >= 0
+            and current_index < len(lyrics)
+        ):
+
+            current_text = lyrics[
+                current_index
+            ]["text"]
+
+            if current_text:
+
+                self.current_lyric_var.set(
+                    current_text
+                )
+
+            else:
+
+                self.current_lyric_var.set(
+                    "♪"
+                )
+
+        else:
+
+            self.current_lyric_var.set(
+                "Waiting for lyrics..."
+            )
+
+        # -------------------------------------------------
+        # Next
+        # -------------------------------------------------
+
+        next_index = (
+            current_index + 1
+        )
+
+        if (
+            next_index >= 0
+            and next_index < len(lyrics)
+        ):
+
+            next_text = lyrics[
+                next_index
+            ]["text"]
+
+            self.next_lyric_var.set(
+                next_text
+            )
+
+        else:
+
+            self.next_lyric_var.set(
+                ""
             )
 
     # =====================================================
@@ -633,7 +904,7 @@ class MusicWindow:
             )
 
             # =================================================
-            # Song information
+            # Song Information
             # =================================================
 
             if title:
@@ -778,33 +1049,10 @@ class MusicWindow:
             # Lyrics
             # =================================================
 
-            if (
-                lyrics
-                and
-                0 <= last_index < len(lyrics)
-            ):
-
-                text = lyrics[
-                    last_index
-                ]["text"]
-
-                if text:
-
-                    self.lyric_var.set(
-                        text
-                    )
-
-                else:
-
-                    self.lyric_var.set(
-                        "♪"
-                    )
-
-            else:
-
-                self.lyric_var.set(
-                    "Waiting for lyrics..."
-                )
+            self.update_lyrics(
+                lyrics,
+                last_index
+            )
 
         except Exception:
             pass
