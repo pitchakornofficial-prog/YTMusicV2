@@ -4,6 +4,17 @@ from winrt.windows.media.control import (
     GlobalSystemMediaTransportControlsSessionManager
 )
 
+from core.sources.spotify import SpotifySource
+from core.sources.youtube_music import YouTubeMusicSource
+from core.sources.youtube import YouTubeSource
+
+
+SOURCES = [
+    SpotifySource(),
+    YouTubeMusicSource(),
+    YouTubeSource(),
+]
+
 
 async def get_manager():
     return await GlobalSystemMediaTransportControlsSessionManager.request_async()
@@ -14,16 +25,10 @@ async def get_current_session(manager):
 
 
 def detect_source(session):
-    app_id = session.source_app_user_model_id
 
-    if not app_id:
-        return "Unknown"
-
-    app_id = app_id.lower()
-
-    # Spotify Desktop
-    if "spotify.exe" in app_id:
-        return "Spotify"
+    for source in SOURCES:
+        if source.can_handle(session):
+            return source.get_name()
 
     return "Unknown"
 
