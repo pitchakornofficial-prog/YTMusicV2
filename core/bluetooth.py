@@ -7,42 +7,56 @@ import serial.tools.list_ports
 
 DEVICE_NAME = "TYMusicV2"
 
+# Retry
 MAX_RETRIES = 0
 RETRY_DELAY = 2.0
 
+# Handshake
 HANDSHAKE_TIMEOUT = 3.0
 
-# ต้องส่งไม่สำเร็จติดต่อกันกี่ครั้ง
-# จึงจะถือว่า Bluetooth หลุด
+# Send failure
 SEND_FAILURE_THRESHOLD = 3
 
-# COM port ล่าสุดที่เชื่อมต่อสำเร็จ
-last_port = None
+# Quiet reconnect settings
+QUIET_AFTER_FAILURES = 3
+MAX_RETRY_DELAY = 5.0
 
-# ป้องกัน serial operation ชนกัน
+
+last_port = None
 serial_lock = threading.RLock()
 
+# ใช้เก็บสถานะล่าสุดเพื่อป้องกันการ print ซ้ำ
+_last_scan_state = None
+_last_error_state = None
 
-def find_bluetooth_ports():
+
+def find_bluetooth_ports(verbose=False):
+    """
+    ค้นหา Bluetooth COM ports
+
+    verbose=False:
+        ไม่แสดง COM port ทุกครั้งที่ scan
+
+    verbose=True:
+        แสดงรายละเอียด COM port ทั้งหมด
+    """
+
+    global _last_scan_state
+
     devices = []
-
-    print("\nScanning Bluetooth COM ports...")
 
     try:
         ports = serial.tools.list_ports.comports()
     except Exception as e:
-        print(f"Bluetooth scan error: {e}")
+        if _last_error_state != str(e):
+            print(f"Bluetooth scan error: {e}")
+            _last_error_state = str(e)
+
         return devices
 
     for port in ports:
         description = port.description or ""
         manufacturer = port.manufacturer or ""
-
-        print(
-            f"Port: {port.device} | "
-            f"Description: {description} | "
-            f"Manufacturer: {manufacturer}"
-        )
 
         text = f"{description} {manufacturer}".lower()
 
@@ -55,6 +69,28 @@ def find_bluetooth_ports():
                 "name": description,
                 "manufacturer": manufacturer
             })
+
+    # สถานะเปลี่ยน เช่น 0 -> 4 หรือ 4 -> 0
+    current_state = tuple(
+        device["port"]
+        for device in devices
+    )
+
+    if verbose or current_state != _last_scan_state:
+        if devices:
+            print("\nBluetooth COM ports found:")
+
+            for device in devices:
+                print(
+                    f"  {device['port']} | "
+                    f"{device['name']} | "
+                    f"{device['manufacturer']}"
+                )
+        else:
+            if _last_scan_state is not None:
+                print("\nBluetooth COM ports not available.")
+
+        _last_scan_state = current_state
 
     return devices
 
@@ -69,11 +105,18 @@ def connect(port, baudrate=115200):
         )
 
         print(f"Connected: {port}")
-
         return connection
 
     except Exception as e:
-        print(f"Connection failed: {port} - {e}")
+        # ไม่ print error เดิมซ้ำทุก retry
+        global _last_error_state
+
+        error_state = f"{port}: {e}"
+
+        if error_state != _last_error_state:
+            print(f"Connection failed: {port} - {e}")
+            _last_error_state = error_state
+
         return None
 
 
@@ -105,12 +148,10 @@ def send(connection, message):
             serial.SerialTimeoutException,
             OSError
         ) as e:
-
             print(f"Bluetooth send error: {e}")
             return False
 
         except Exception as e:
-
             print(f"Bluetooth send error: {e}")
             return False
 
@@ -151,7 +192,6 @@ def handshake(connection):
             while time.time() < deadline:
 
                 if connection.in_waiting:
-
                     line = connection.readline()
 
                     response = line.decode(
@@ -165,7 +205,6 @@ def handshake(connection):
                         )
 
                     if response == DEVICE_NAME:
-
                         print(
                             f"Handshake OK: {DEVICE_NAME}"
                         )
@@ -187,7 +226,6 @@ def handshake(connection):
             serial.SerialTimeoutException,
             OSError
         ) as e:
-
             print(
                 f"Handshake connection error: {e}"
             )
@@ -195,16 +233,13 @@ def handshake(connection):
             return False
 
         except Exception as e:
-
-            print(
-                f"Handshake error: {e}"
-            )
-
+            print(f"Handshake error: {e}")
             return False
 
 
 def try_port(port):
     global last_port
+    global _last_error_state
 
     connection = connect(port)
 
@@ -212,8 +247,10 @@ def try_port(port):
         return None
 
     if handshake(connection):
-
         last_port = port
+
+        # ล้าง error state
+        _last_error_state = None
 
         print(
             f"\n{DEVICE_NAME} connected on {port}"
@@ -234,30 +271,22 @@ def find_and_connect_once():
     devices = find_bluetooth_ports()
 
     if not devices:
-
-        print("\nNo Bluetooth COM ports found.")
-
         return None
-
-    print(
-        f"\nFound {len(devices)} "
-        f"Bluetooth COM port(s)."
-    )
 
     ports = [
         device["port"]
         for device in devices
     ]
 
-    # ---------------------------------------------
-    # ลอง COM ล่าสุดก่อน
-    # ---------------------------------------------
+    # --------------------------------
+    # Try last successful port first
+    # --------------------------------
 
     if last_port and last_port in ports:
 
         print(
             f"\nTrying last successful port "
-            f"{last_port} first..."
+            f"{last_port}..."
         )
 
         connection = try_port(last_port)
@@ -265,77 +294,105 @@ def find_and_connect_once():
         if connection:
             return connection
 
-        print(
-            f"Last port {last_port} failed."
-        )
-
-    # ---------------------------------------------
-    # ลอง COM อื่น
-    # ---------------------------------------------
+    # --------------------------------
+    # Try other Bluetooth ports
+    # --------------------------------
 
     for port in ports:
 
         if port == last_port:
             continue
 
-        print(f"\nTrying {port}...")
-
         connection = try_port(port)
 
         if connection:
             return connection
 
-    print(
-        f"\n{DEVICE_NAME} not found in this scan."
-    )
-
     return None
 
 
 def find_and_connect():
+    """
+    Initial connection / reconnect
+
+    ทำงานแบบ quiet:
+    - ไม่แสดง attempt number
+    - ไม่ spam รายละเอียดทุก scan
+    - เพิ่ม delay เมื่อ reconnect ไม่สำเร็จ
+    """
+
     retry_count = 0
+    retry_delay = RETRY_DELAY
+
+    waiting_message_shown = False
 
     while True:
 
         retry_count += 1
 
-        print()
-        print("==============================")
-        print(
-            f"Bluetooth connection attempt "
-            f"#{retry_count}"
-        )
-        print("==============================")
-
         connection = find_and_connect_once()
 
         if connection:
+            print(
+                f"{DEVICE_NAME} connection successful."
+            )
+
             return connection
+
+        # --------------------------------
+        # No Bluetooth device available
+        # --------------------------------
+
+        if not waiting_message_shown:
+            print(
+                "\nWaiting for Bluetooth device..."
+            )
+
+            waiting_message_shown = True
+
+        time.sleep(retry_delay)
+
+        # ค่อย ๆ เพิ่ม delay แต่ไม่เกิน MAX_RETRY_DELAY
+        retry_delay = min(
+            retry_delay + 0.5,
+            MAX_RETRY_DELAY
+        )
+
+        # --------------------------------
+        # Optional retry limit
+        # --------------------------------
 
         if (
             MAX_RETRIES > 0
             and retry_count >= MAX_RETRIES
         ):
-
             print(
                 "\nMaximum Bluetooth retries reached."
             )
 
             return None
 
-        print(
-            f"\nRetrying in "
-            f"{RETRY_DELAY:.1f} seconds..."
-        )
-
-        time.sleep(RETRY_DELAY)
-
 
 def reconnect(connection=None):
+    """
+    Reconnect Bluetooth หลัง connection หลุด
+    """
+
+    global _last_scan_state
+    global _last_error_state
+
     print()
     print("==============================")
     print("Bluetooth reconnect")
     print("==============================")
+
+    # Reset quiet-state
+    _last_scan_state = None
+    _last_error_state = None
+
+    # --------------------------------
+    # Close old connection
+    # --------------------------------
 
     if connection:
 
@@ -346,6 +403,10 @@ def reconnect(connection=None):
         close(connection)
 
         time.sleep(0.7)
+
+    # --------------------------------
+    # Search and reconnect
+    # --------------------------------
 
     new_connection = find_and_connect()
 
@@ -358,27 +419,23 @@ def reconnect(connection=None):
         return new_connection
 
     print(
-        f"\nUnable to reconnect to "
-        f"{DEVICE_NAME}."
+        f"\nUnable to reconnect to {DEVICE_NAME}."
     )
 
     return None
 
 
-# --------------------------------------------------
-# Optional PING
-# --------------------------------------------------
-# เก็บไว้สำหรับทดสอบด้วยตัวเอง
-# ระบบ reconnect หลักจะไม่ใช้ PING แล้ว
-# --------------------------------------------------
-
 def ping(connection, timeout=2.0):
+    """
+    Optional diagnostic only.
+    ไม่ใช้เป็นตัวตัดสิน reconnect หลัก
+    """
+
     if not is_connected(connection):
         return False
 
     with serial_lock:
         try:
-
             connection.reset_input_buffer()
 
             connection.write(b"PING\n")
