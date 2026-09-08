@@ -93,6 +93,7 @@ async def load_song(music, connection):
     title = music["title"]
     artist = music["artist"]
     duration = music["duration"]
+    source = music["source"]
     position = music["position"]
 
     status = music["status"]
@@ -123,6 +124,7 @@ async def load_song(music, connection):
     print(f"Title    : {title}")
     print(f"Artist   : {artist}")
     print(f"Duration : {duration:.2f}")
+    print(f"Source   : {source}")
     print(f"Position : {position:.2f}")
     print("==============================")
 
