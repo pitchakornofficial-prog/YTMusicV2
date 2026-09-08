@@ -1,5 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
+import io
+
+from PIL import Image, ImageTk
 
 
 class MusicWindow:
@@ -9,15 +12,23 @@ class MusicWindow:
         self.state = state
 
         self.root = tk.Tk()
+
         self.root.title("TYMusicV2")
-        self.root.geometry("800x560")
-        self.root.minsize(700, 480)
 
-        self.root.configure(bg="#121212")
+        self.root.geometry("900x620")
 
-        # -------------------------------------------------
+        self.root.minsize(
+            760,
+            520
+        )
+
+        self.root.configure(
+            bg="#121212"
+        )
+
+        # =================================================
         # Variables
-        # -------------------------------------------------
+        # =================================================
 
         self.title_var = tk.StringVar(
             value="No music"
@@ -32,7 +43,7 @@ class MusicWindow:
         )
 
         self.source_var = tk.StringVar(
-            value="Source: Unknown"
+            value="SOURCE: UNKNOWN"
         )
 
         self.current_time_var = tk.StringVar(
@@ -55,39 +66,88 @@ class MusicWindow:
             value="Waiting for lyrics..."
         )
 
-        # -------------------------------------------------
+        # =================================================
+        # Album art cache
+        # =================================================
+
+        self.album_image = None
+
+        self.last_thumbnail = None
+
+        # =================================================
+        # Colors
+        # =================================================
+
+        self.bg = "#121212"
+
+        self.panel = "#181818"
+
+        self.card = "#242424"
+
+        self.text = "#FFFFFF"
+
+        self.secondary = "#B3B3B3"
+
+        self.muted = "#777777"
+
+        self.progress_bg = "#333333"
+
+        self.progress_fg = "#FFFFFF"
+
+        # =================================================
         # Style
-        # -------------------------------------------------
+        # =================================================
 
-        style = ttk.Style()
+        self.setup_style()
 
-        try:
-            style.theme_use("clam")
-        except Exception:
-            pass
-
-        style.configure(
-            "Music.Horizontal.TProgressbar",
-            troughcolor="#282828",
-            background="#ffffff",
-            bordercolor="#282828",
-            lightcolor="#ffffff",
-            darkcolor="#ffffff",
-            thickness=8
-        )
-
-        # -------------------------------------------------
-        # Build
-        # -------------------------------------------------
+        # =================================================
+        # Build UI
+        # =================================================
 
         self.build_ui()
+
+        # =================================================
+        # Close
+        # =================================================
 
         self.root.protocol(
             "WM_DELETE_WINDOW",
             self.close
         )
 
+        # =================================================
+        # Update
+        # =================================================
+
         self.update_ui()
+
+    # =====================================================
+    # Style
+    # =====================================================
+
+    def setup_style(self):
+
+        style = ttk.Style()
+
+        try:
+
+            style.theme_use(
+                "clam"
+            )
+
+        except Exception:
+
+            pass
+
+        style.configure(
+            "Music.Horizontal.TProgressbar",
+            troughcolor=self.progress_bg,
+            background=self.progress_fg,
+            bordercolor=self.progress_bg,
+            lightcolor=self.progress_fg,
+            darkcolor=self.progress_fg,
+            thickness=7
+        )
 
     # =====================================================
     # Build UI
@@ -97,13 +157,13 @@ class MusicWindow:
 
         main = tk.Frame(
             self.root,
-            bg="#121212"
+            bg=self.bg
         )
 
         main.pack(
             fill="both",
             expand=True,
-            padx=30,
+            padx=35,
             pady=25
         )
 
@@ -113,7 +173,7 @@ class MusicWindow:
 
         header = tk.Frame(
             main,
-            bg="#121212"
+            bg=self.bg
         )
 
         header.pack(
@@ -123,187 +183,245 @@ class MusicWindow:
         logo = tk.Label(
             header,
             text="TYMusicV2",
-            font=("Segoe UI", 20, "bold"),
-            fg="white",
-            bg="#121212"
+            font=(
+                "Segoe UI",
+                21,
+                "bold"
+            ),
+            fg=self.text,
+            bg=self.bg
         )
 
         logo.pack(
             side="left"
         )
 
-        right_header = tk.Frame(
+        status_frame = tk.Frame(
             header,
-            bg="#121212"
+            bg=self.bg
         )
 
-        right_header.pack(
+        status_frame.pack(
             side="right"
         )
 
         self.playback_label = tk.Label(
-            right_header,
+            status_frame,
             textvariable=self.playback_var,
-            font=("Segoe UI", 9, "bold"),
-            fg="white",
-            bg="#282828",
-            padx=10,
-            pady=5
+            font=(
+                "Segoe UI",
+                9,
+                "bold"
+            ),
+            fg=self.text,
+            bg=self.card,
+            padx=12,
+            pady=6
         )
 
         self.playback_label.pack(
             side="left",
-            padx=(0, 10)
+            padx=(0, 8)
         )
 
-        bluetooth = tk.Label(
-            right_header,
+        self.bluetooth_label = tk.Label(
+            status_frame,
             textvariable=self.bluetooth_var,
-            font=("Segoe UI", 10),
-            fg="#b3b3b3",
-            bg="#121212"
+            font=(
+                "Segoe UI",
+                9
+            ),
+            fg=self.secondary,
+            bg=self.bg
         )
 
-        bluetooth.pack(
+        self.bluetooth_label.pack(
             side="left"
         )
 
         # =================================================
-        # Music
+        # Music card
         # =================================================
 
-        music_frame = tk.Frame(
+        music_card = tk.Frame(
             main,
-            bg="#121212"
+            bg=self.panel
         )
 
-        music_frame.pack(
+        music_card.pack(
             fill="x",
-            pady=(30, 20)
+            pady=(28, 20)
         )
 
-        # -------------------------------------------------
+        # =================================================
         # Album Art
-        # -------------------------------------------------
+        # =================================================
 
-        album = tk.Frame(
-            music_frame,
-            width=220,
-            height=220,
-            bg="#282828"
+        album_container = tk.Frame(
+            music_card,
+            width=250,
+            height=250,
+            bg=self.card
         )
 
-        album.pack(
-            side="left"
+        album_container.pack(
+            side="left",
+            padx=25,
+            pady=25
         )
 
-        album.pack_propagate(False)
+        album_container.pack_propagate(
+            False
+        )
 
-        album_label = tk.Label(
-            album,
+        self.album_art = tk.Label(
+            album_container,
             text="♪",
-            font=("Segoe UI", 72),
-            fg="#777777",
-            bg="#282828"
+            font=(
+                "Segoe UI",
+                82,
+                "normal"
+            ),
+            fg="#666666",
+            bg=self.card
         )
 
-        album_label.pack(
+        self.album_art.pack(
             expand=True
         )
 
-        # -------------------------------------------------
-        # Song Info
-        # -------------------------------------------------
+        # =================================================
+        # Information
+        # =================================================
 
         info = tk.Frame(
-            music_frame,
-            bg="#121212"
+            music_card,
+            bg=self.panel
         )
 
         info.pack(
             side="left",
             fill="both",
             expand=True,
-            padx=(30, 0)
+            padx=(5, 30),
+            pady=25
         )
 
-        title = tk.Label(
+        now_playing = tk.Label(
+            info,
+            text="NOW PLAYING",
+            font=(
+                "Segoe UI",
+                9,
+                "bold"
+            ),
+            fg=self.muted,
+            bg=self.panel
+        )
+
+        now_playing.pack(
+            anchor="w",
+            pady=(5, 10)
+        )
+
+        self.title_label = tk.Label(
             info,
             textvariable=self.title_var,
-            font=("Segoe UI", 26, "bold"),
-            fg="white",
-            bg="#121212",
+            font=(
+                "Segoe UI",
+                25,
+                "bold"
+            ),
+            fg=self.text,
+            bg=self.panel,
             anchor="w",
             justify="left",
-            wraplength=480
+            wraplength=500
         )
 
-        title.pack(
+        self.title_label.pack(
             fill="x",
-            pady=(10, 5)
+            anchor="w"
         )
 
         artist = tk.Label(
             info,
             textvariable=self.artist_var,
-            font=("Segoe UI", 15),
-            fg="#b3b3b3",
-            bg="#121212",
+            font=(
+                "Segoe UI",
+                16
+            ),
+            fg=self.secondary,
+            bg=self.panel,
             anchor="w"
         )
 
         artist.pack(
-            fill="x"
+            fill="x",
+            pady=(8, 0)
         )
 
-        album_name = tk.Label(
+        album = tk.Label(
             info,
             textvariable=self.album_var,
-            font=("Segoe UI", 11),
-            fg="#777777",
-            bg="#121212",
+            font=(
+                "Segoe UI",
+                11
+            ),
+            fg=self.muted,
+            bg=self.panel,
             anchor="w"
         )
 
-        album_name.pack(
+        album.pack(
             fill="x",
-            pady=(8, 20)
+            pady=(5, 18)
         )
 
-        source = tk.Label(
+        source_frame = tk.Frame(
             info,
+            bg=self.panel
+        )
+
+        source_frame.pack(
+            anchor="w"
+        )
+
+        source_label = tk.Label(
+            source_frame,
             textvariable=self.source_var,
-            font=("Segoe UI", 10, "bold"),
-            fg="white",
-            bg="#282828",
+            font=(
+                "Segoe UI",
+                9,
+                "bold"
+            ),
+            fg=self.text,
+            bg=self.card,
             padx=12,
             pady=6
         )
 
-        source.pack(
-            anchor="w"
-        )
+        source_label.pack()
 
         # =================================================
         # Progress
         # =================================================
 
-        progress_frame = tk.Frame(
+        progress_section = tk.Frame(
             main,
-            bg="#121212"
+            bg=self.bg
         )
 
-        progress_frame.pack(
-            fill="x",
-            pady=(5, 20)
+        progress_section.pack(
+            fill="x"
         )
 
         self.progress = ttk.Progressbar(
-            progress_frame,
+            progress_section,
             orient="horizontal",
             mode="determinate",
-            style="Music.Horizontal.TProgressbar",
-            maximum=100
+            maximum=100,
+            style="Music.Horizontal.TProgressbar"
         )
 
         self.progress.pack(
@@ -311,33 +429,39 @@ class MusicWindow:
         )
 
         time_frame = tk.Frame(
-            progress_frame,
-            bg="#121212"
+            progress_section,
+            bg=self.bg
         )
 
         time_frame.pack(
             fill="x",
-            pady=(6, 0)
+            pady=(7, 0)
         )
 
-        current = tk.Label(
+        current_time = tk.Label(
             time_frame,
             textvariable=self.current_time_var,
-            font=("Segoe UI", 9),
-            fg="#888888",
-            bg="#121212"
+            font=(
+                "Segoe UI",
+                9
+            ),
+            fg=self.secondary,
+            bg=self.bg
         )
 
-        current.pack(
+        current_time.pack(
             side="left"
         )
 
         duration = tk.Label(
             time_frame,
             textvariable=self.duration_var,
-            font=("Segoe UI", 9),
-            fg="#888888",
-            bg="#121212"
+            font=(
+                "Segoe UI",
+                9
+            ),
+            fg=self.secondary,
+            bg=self.bg
         )
 
         duration.pack(
@@ -348,40 +472,117 @@ class MusicWindow:
         # Lyrics
         # =================================================
 
-        lyrics_frame = tk.Frame(
+        lyrics_card = tk.Frame(
             main,
-            bg="#121212"
+            bg=self.panel
         )
 
-        lyrics_frame.pack(
+        lyrics_card.pack(
             fill="both",
             expand=True,
-            pady=(10, 0)
+            pady=(22, 0)
         )
 
-        lyrics_title = tk.Label(
-            lyrics_frame,
+        lyrics_header = tk.Label(
+            lyrics_card,
             text="CURRENT LYRICS",
-            font=("Segoe UI", 9, "bold"),
-            fg="#777777",
-            bg="#121212"
+            font=(
+                "Segoe UI",
+                9,
+                "bold"
+            ),
+            fg=self.muted,
+            bg=self.panel
         )
 
-        lyrics_title.pack()
+        lyrics_header.pack(
+            pady=(15, 0)
+        )
 
-        lyric = tk.Label(
-            lyrics_frame,
+        self.lyric_label = tk.Label(
+            lyrics_card,
             textvariable=self.lyric_var,
-            font=("Segoe UI", 22, "bold"),
-            fg="white",
-            bg="#121212",
-            wraplength=700,
+            font=(
+                "Segoe UI",
+                22,
+                "bold"
+            ),
+            fg=self.text,
+            bg=self.panel,
+            wraplength=760,
             justify="center"
         )
 
-        lyric.pack(
-            expand=True
+        self.lyric_label.pack(
+            fill="both",
+            expand=True,
+            padx=30
         )
+
+    # =====================================================
+    # Album Art
+    # =====================================================
+
+    def update_album_art(self, thumbnail):
+
+        if not thumbnail:
+
+            self.album_image = None
+
+            self.last_thumbnail = None
+
+            self.album_art.configure(
+                image="",
+                text="♪"
+            )
+
+            return
+
+        if thumbnail == self.last_thumbnail:
+
+            return
+
+        try:
+
+            self.last_thumbnail = thumbnail
+
+            image = Image.open(
+                io.BytesIO(thumbnail)
+            )
+
+            image = image.convert(
+                "RGB"
+            )
+
+            # Make the image exactly fit the album-art box
+            image = image.resize(
+                (250, 250),
+                Image.Resampling.LANCZOS
+            )
+
+            self.album_image = ImageTk.PhotoImage(
+                image
+            )
+
+            self.album_art.configure(
+                image=self.album_image,
+                text=""
+            )
+
+        except Exception as e:
+
+            print(
+                f"Album art display error: {e}"
+            )
+
+            self.album_image = None
+
+            self.last_thumbnail = None
+
+            self.album_art.configure(
+                image="",
+                text="♪"
+            )
 
     # =====================================================
     # Update UI
@@ -391,21 +592,31 @@ class MusicWindow:
 
         try:
 
-            # -------------------------------------------------
-            # Read state
-            # -------------------------------------------------
-
             title = self.state.title
+
             artist = self.state.artist
+
             album = self.state.album
+
             source = self.state.source
+
+            thumbnail = getattr(
+                self.state,
+                "thumbnail",
+                None
+            )
 
             duration = self.state.duration
 
             lyrics = self.state.lyrics
-            last_index = self.state.last_lyric_index
 
-            position = self.state.display_position
+            last_index = (
+                self.state.last_lyric_index
+            )
+
+            position = (
+                self.state.display_position
+            )
 
             bluetooth_connected = (
                 self.state.bluetooth_connected
@@ -413,34 +624,82 @@ class MusicWindow:
 
             playing = self.state.playing
 
-            # -------------------------------------------------
-            # Music information
-            # -------------------------------------------------
+            # =================================================
+            # Album Art
+            # =================================================
 
-            self.title_var.set(
-                title if title else "No music"
+            self.update_album_art(
+                thumbnail
             )
 
-            self.artist_var.set(
-                artist if artist else "Unknown artist"
-            )
+            # =================================================
+            # Song information
+            # =================================================
 
-            self.album_var.set(
-                album if album else "Unknown album"
-            )
+            if title:
 
-            self.source_var.set(
-                f"Source: {source}"
-            )
+                self.title_var.set(
+                    title
+                )
 
-            # -------------------------------------------------
-            # Playback state
-            # -------------------------------------------------
+            else:
+
+                self.title_var.set(
+                    "No music"
+                )
+
+            if artist:
+
+                self.artist_var.set(
+                    artist
+                )
+
+            else:
+
+                self.artist_var.set(
+                    "Unknown artist"
+                )
+
+            if album:
+
+                self.album_var.set(
+                    album
+                )
+
+            else:
+
+                self.album_var.set(
+                    "Unknown album"
+                )
+
+            # =================================================
+            # Source
+            # =================================================
+
+            if source:
+
+                self.source_var.set(
+                    f"SOURCE: {source.upper()}"
+                )
+
+            else:
+
+                self.source_var.set(
+                    "SOURCE: UNKNOWN"
+                )
+
+            # =================================================
+            # Playback
+            # =================================================
 
             if playing:
 
                 self.playback_var.set(
                     "PLAYING"
+                )
+
+                self.playback_label.configure(
+                    bg="#303030"
                 )
 
             else:
@@ -449,9 +708,13 @@ class MusicWindow:
                     "PAUSED"
                 )
 
-            # -------------------------------------------------
+                self.playback_label.configure(
+                    bg="#242424"
+                )
+
+            # =================================================
             # Bluetooth
-            # -------------------------------------------------
+            # =================================================
 
             if bluetooth_connected:
 
@@ -465,9 +728,9 @@ class MusicWindow:
                     "Bluetooth: Disconnected"
                 )
 
-            # -------------------------------------------------
-            # Position
-            # -------------------------------------------------
+            # =================================================
+            # Progress
+            # =================================================
 
             if duration > 0:
 
@@ -480,10 +743,14 @@ class MusicWindow:
                 )
 
                 percentage = (
-                    position / duration
-                ) * 100
+                    position
+                    / duration
+                    * 100
+                )
 
-                self.progress["value"] = percentage
+                self.progress["value"] = (
+                    percentage
+                )
 
             else:
 
@@ -491,21 +758,25 @@ class MusicWindow:
 
                 self.progress["value"] = 0
 
-            # -------------------------------------------------
+            # =================================================
             # Time
-            # -------------------------------------------------
+            # =================================================
 
             self.current_time_var.set(
-                self.format_time(position)
+                self.format_time(
+                    position
+                )
             )
 
             self.duration_var.set(
-                self.format_time(duration)
+                self.format_time(
+                    duration
+                )
             )
 
-            # -------------------------------------------------
+            # =================================================
             # Lyrics
-            # -------------------------------------------------
+            # =================================================
 
             if (
                 lyrics
@@ -513,11 +784,21 @@ class MusicWindow:
                 0 <= last_index < len(lyrics)
             ):
 
-                text = lyrics[last_index]["text"]
+                text = lyrics[
+                    last_index
+                ]["text"]
 
-                self.lyric_var.set(
-                    text
-                )
+                if text:
+
+                    self.lyric_var.set(
+                        text
+                    )
+
+                else:
+
+                    self.lyric_var.set(
+                        "♪"
+                    )
 
             else:
 
@@ -528,25 +809,26 @@ class MusicWindow:
         except Exception:
             pass
 
-        # -----------------------------------------------------
-        # Update every 100 ms
-        # -----------------------------------------------------
-
         self.root.after(
             100,
             self.update_ui
         )
 
     # =====================================================
-    # Helpers
+    # Format Time
     # =====================================================
 
     @staticmethod
     def format_time(seconds):
 
         try:
-            seconds = int(seconds)
+
+            seconds = int(
+                seconds
+            )
+
         except Exception:
+
             seconds = 0
 
         seconds = max(
@@ -554,10 +836,28 @@ class MusicWindow:
             seconds
         )
 
-        minutes = seconds // 60
-        seconds = seconds % 60
+        hours = seconds // 3600
 
-        return f"{minutes}:{seconds:02d}"
+        minutes = (
+            seconds % 3600
+        ) // 60
+
+        seconds = (
+            seconds % 60
+        )
+
+        if hours > 0:
+
+            return (
+                f"{hours}:"
+                f"{minutes:02d}:"
+                f"{seconds:02d}"
+            )
+
+        return (
+            f"{minutes}:"
+            f"{seconds:02d}"
+        )
 
     # =====================================================
     # Run

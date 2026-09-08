@@ -23,7 +23,9 @@ from core.bluetooth import (
 PLAYING = 4
 
 MEDIA_POLL_INTERVAL = 0.5
+
 LYRIC_UPDATE_INTERVAL = 0.02
+
 SEEK_THRESHOLD = 2.0
 
 
@@ -32,26 +34,31 @@ class PlayerState:
     def __init__(self):
 
         self.title = ""
+
         self.artist = ""
+
         self.album = ""
+
+        self.thumbnail = None
+
         self.source = "Unknown"
 
         self.duration = 0.0
 
         self.lyrics = []
+
         self.lyric_times = []
 
-        # Position anchor
         self.anchor_position = 0.0
+
         self.anchor_clock = time.perf_counter()
 
         self.playing = False
+
         self.rate = 1.0
 
-        # Position reported by Windows Media Session
         self.windows_position = 0.0
 
-        # Position used by UI / lyric engine
         self.display_position = 0.0
 
         self.last_lyric_index = -1
@@ -63,10 +70,6 @@ class PlayerState:
 
 state = PlayerState()
 
-
-# =========================================================
-# Position / Clock
-# =========================================================
 
 async def set_anchor(position, playing, rate):
 
@@ -90,15 +93,16 @@ async def get_position():
     async with state.lock:
 
         anchor_position = state.anchor_position
+
         anchor_clock = state.anchor_clock
 
         playing = state.playing
+
         rate = state.rate
 
         duration = state.duration
 
     if not playing:
-
         return anchor_position
 
     elapsed = (
@@ -121,18 +125,19 @@ async def get_position():
     return position
 
 
-# =========================================================
-# Load Song
-# =========================================================
-
 async def load_song(music, connection):
 
     title = music["title"]
+
     artist = music["artist"]
 
     album = music.get(
         "album",
         ""
+    )
+
+    thumbnail = music.get(
+        "thumbnail"
     )
 
     duration = music["duration"]
@@ -156,6 +161,8 @@ async def load_song(music, connection):
         state.artist = artist
 
         state.album = album
+
+        state.thumbnail = thumbnail
 
         state.source = source
 
@@ -199,11 +206,12 @@ async def load_song(music, connection):
 
     print(f"Position : {position:.2f}")
 
-    print("==============================")
+    print(
+        f"Thumbnail: "
+        f"{'YES' if thumbnail else 'NO'}"
+    )
 
-    # -----------------------------------------------------
-    # Send song information to ESP32
-    # -----------------------------------------------------
+    print("==============================")
 
     if connection:
 
@@ -212,13 +220,7 @@ async def load_song(music, connection):
             f"INFO={title}|{artist}|"
         )
 
-    # -----------------------------------------------------
-    # Search lyrics
-    # -----------------------------------------------------
-
-    print(
-        "Searching lyrics..."
-    )
+    print("Searching lyrics...")
 
     try:
 
@@ -239,19 +241,11 @@ async def load_song(music, connection):
 
     if not lrc:
 
-        print(
-            "Lyrics not found."
-        )
+        print("Lyrics not found.")
 
         return
 
-    # -----------------------------------------------------
-    # Parse LRC
-    # -----------------------------------------------------
-
-    lyrics = parse_lrc(
-        lrc
-    )
+    lyrics = parse_lrc(lrc)
 
     lyric_times = build_lyrics_index(
         lyrics
@@ -259,9 +253,7 @@ async def load_song(music, connection):
 
     if not lyrics:
 
-        print(
-            "Lyrics empty."
-        )
+        print("Lyrics empty.")
 
         return
 
@@ -278,14 +270,7 @@ async def load_song(music, connection):
     )
 
 
-# =========================================================
-# Media Monitor
-# =========================================================
-
-async def media_monitor(
-    manager,
-    connection
-):
+async def media_monitor(manager, connection):
 
     current_session = None
 
@@ -304,10 +289,6 @@ async def media_monitor(
             session = await get_current_session(
                 manager
             )
-
-            # -------------------------------------------------
-            # Media session changed
-            # -------------------------------------------------
 
             if session != current_session:
 
@@ -341,10 +322,6 @@ async def media_monitor(
 
                 continue
 
-            # -------------------------------------------------
-            # Read media information
-            # -------------------------------------------------
-
             music = await get_music_info(
                 session
             )
@@ -362,27 +339,18 @@ async def media_monitor(
             status = music["status"]
 
             rate = (
-                music["rate"]
-                or 1.0
+                music["rate"] or 1.0
             )
 
             playing = (
                 status == PLAYING
             )
 
-            # -------------------------------------------------
-            # Song ID
-            # -------------------------------------------------
-
             song_id = (
                 title,
                 artist,
                 round(duration, 1)
             )
-
-            # -------------------------------------------------
-            # New song
-            # -------------------------------------------------
 
             if song_id != current_song:
 
@@ -407,10 +375,6 @@ async def media_monitor(
 
                 continue
 
-            # -------------------------------------------------
-            # Play / Pause
-            # -------------------------------------------------
-
             if previous_status is not None:
 
                 was_playing = (
@@ -432,10 +396,6 @@ async def media_monitor(
                         rate
                     )
 
-            # -------------------------------------------------
-            # Playback rate changed
-            # -------------------------------------------------
-
             if previous_rate is not None:
 
                 if abs(
@@ -454,10 +414,6 @@ async def media_monitor(
                         playing,
                         rate
                     )
-
-            # -------------------------------------------------
-            # Seek detection
-            # -------------------------------------------------
 
             if (
                 previous_position is not None
@@ -494,10 +450,6 @@ async def media_monitor(
                         rate
                     )
 
-            # -------------------------------------------------
-            # Save previous values
-            # -------------------------------------------------
-
             previous_status = status
 
             previous_rate = rate
@@ -527,10 +479,6 @@ async def media_monitor(
             )
 
 
-# =========================================================
-# Lyrics Engine
-# =========================================================
-
 async def lyric_engine(connection):
 
     while True:
@@ -541,7 +489,6 @@ async def lyric_engine(connection):
 
             async with state.lock:
 
-                # Position สำหรับ UI
                 state.display_position = (
                     position
                 )
@@ -572,10 +519,6 @@ async def lyric_engine(connection):
 
                 continue
 
-            # -------------------------------------------------
-            # Find current lyric
-            # -------------------------------------------------
-
             index = bisect.bisect_right(
                 lyric_times,
                 position
@@ -588,10 +531,6 @@ async def lyric_engine(connection):
                 )
 
                 continue
-
-            # -------------------------------------------------
-            # New lyric line
-            # -------------------------------------------------
 
             if index != last_index:
 
@@ -606,10 +545,6 @@ async def lyric_engine(connection):
                 print(
                     f"[{position:08.2f}] {lyric}"
                 )
-
-                # -------------------------------------------------
-                # Send lyric to ESP32
-                # -------------------------------------------------
 
                 if connection:
 
@@ -633,27 +568,13 @@ async def lyric_engine(connection):
             )
 
 
-# =========================================================
-# Main
-# =========================================================
-
 async def main():
 
-    print(
-        "=============================="
-    )
+    print("==============================")
 
-    print(
-        "       TYMusicV2"
-    )
+    print("       TYMusicV2")
 
-    print(
-        "=============================="
-    )
-
-    # -----------------------------------------------------
-    # Bluetooth
-    # -----------------------------------------------------
+    print("==============================")
 
     print(
         "\nSearching TYMusicV2 Bluetooth..."
@@ -684,19 +605,11 @@ async def main():
             "\nTYMusicV2 Bluetooth device not found."
         )
 
-    # -----------------------------------------------------
-    # Waiting for music
-    # -----------------------------------------------------
-
     print(
         "\nWaiting for music...\n"
     )
 
     manager = await get_manager()
-
-    # -----------------------------------------------------
-    # Media Monitor + Lyrics Engine
-    # -----------------------------------------------------
 
     await asyncio.gather(
 
@@ -711,12 +624,6 @@ async def main():
     )
 
 
-# =========================================================
-# Entry Point
-# =========================================================
-
 if __name__ == "__main__":
 
-    asyncio.run(
-        main()
-    )
+    asyncio.run(main())
